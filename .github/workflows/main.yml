@@ -32,18 +32,12 @@ on:
           - Release
         default: Actions
 
-      # ==================== KernelSU 配置 ====================
-      kernelsu_variant:
-        description: "KernelSU 变体"
-        type: choice
-        options:
-          - SukiSU
-          - SukiSU(40726)
-          - SukiSU(40548)
-          - ReSukiSU
-          - Official
-          #- Next
-        default: ReSukiSU
+      # KittiSU configuration
+      kittisu_branch:
+        description: "KittiSU branch"
+        type: string
+        required: false
+        default: main
 
       # ==================== 可选配置 ====================
       version:
@@ -134,7 +128,7 @@ jobs:
     uses: ./.github/workflows/get-manager.yml
     secrets: inherit
     with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kittisu_branch: ${{ inputs.kittisu_branch }}
 
   # ==================== Android 12 - 5.10 构建 ====================
   build-a12-5-10:
@@ -142,7 +136,7 @@ jobs:
     uses: ./.github/workflows/kernel-a12-5-10.yml
     secrets: inherit
     with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kittisu_branch: ${{ inputs.kittisu_branch }}
       version: ${{ inputs.version }}
       build_time: ${{ inputs.build_time || '' }}
       use_zram: ${{ inputs.use_zram }}
@@ -162,7 +156,7 @@ jobs:
     uses: ./.github/workflows/kernel-a13-5-15.yml
     secrets: inherit
     with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kittisu_branch: ${{ inputs.kittisu_branch }}
       version: ${{ inputs.version }}
       build_time: ${{ inputs.build_time || '' }}
       use_zram: ${{ inputs.use_zram }}
@@ -182,7 +176,7 @@ jobs:
     uses: ./.github/workflows/kernel-a14-6-1.yml
     secrets: inherit
     with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kittisu_branch: ${{ inputs.kittisu_branch }}
       version: ${{ inputs.version }}
       build_time: ${{ inputs.build_time || '' }}
       use_zram: ${{ inputs.use_zram }}
@@ -202,7 +196,7 @@ jobs:
     uses: ./.github/workflows/kernel-a15-6-6.yml
     secrets: inherit
     with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kittisu_branch: ${{ inputs.kittisu_branch }}
       version: ${{ inputs.version }}
       build_time: ${{ inputs.build_time || '' }}
       use_zram: ${{ inputs.use_zram }}
@@ -222,7 +216,7 @@ jobs:
     uses: ./.github/workflows/kernel-a16-6-12.yml
     secrets: inherit
     with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kittisu_branch: ${{ inputs.kittisu_branch }}
       version: ${{ inputs.version }}
       build_time: ${{ inputs.build_time || '' }}
       use_zram: ${{ inputs.use_zram }}
@@ -303,14 +297,7 @@ jobs:
       # 预计算各种显示名称，简化后续引用
       - name: 设置显示名称
         run: |
-          # KSU 显示名称
-          case "${{ inputs.kernelsu_variant }}" in
-            "Next")      KSU_NAME="KernelSU-Next" ;;
-            "Official")  KSU_NAME="KernelSU" ;;
-            "SukiSU")    KSU_NAME="SukiSU" ;;
-            "ReSukiSU")  KSU_NAME="ReSukiSU" ;;
-          esac
-          echo "KSU_NAME=$KSU_NAME" >> $GITHUB_ENV
+          echo "KSU_NAME=KittiSU" >> $GITHUB_ENV
 
           # 版本信息
           KSU_VER="${{ needs.get-manager.outputs.ksuVer }}"
@@ -329,19 +316,8 @@ jobs:
             echo "KPM_STATUS=未开启" >> $GITHUB_ENV
           fi
 
-          # Hook 类型
-          if [ "${{ inputs.kernelsu_variant }}" = "SukiSU" ] || [ "${{ inputs.kernelsu_variant }}" = "ReSukiSU" ]; then
-            echo "HOOK_TYPE=SUSFS Inline Hooks" >> $GITHUB_ENV
-          else
-            echo "HOOK_TYPE=KPROBE Hooks" >> $GITHUB_ENV
-          fi
-
-          # Mount 类型
-          if [ "${{ inputs.kernelsu_variant }}" = "Official" ]; then
-            echo "MOUNT_TYPE=OVERLAYFS" >> $GITHUB_ENV
-          else
-            echo "MOUNT_TYPE=Magic Mount" >> $GITHUB_ENV
-          fi
+          echo "HOOK_TYPE=SUSFS Inline Hooks" >> $GITHUB_ENV
+          echo "MOUNT_TYPE=Magic Mount" >> $GITHUB_ENV
 
           # 发布标题
           echo "RELEASE_NAME=GKI Kernel: ${KSU_NAME} ${KSU_VER} + SUSFS ${SUS_VER}" >> $GITHUB_ENV
@@ -371,55 +347,19 @@ jobs:
         with:
           ref: ${{ github.sha }}
 
-      # ==================== 确定 KSU 引用 ====================
-      # 根据实际构建逻辑确定 KernelSU 上游引用
-      - name: 确定 KSU 引用
+      - name: Get KittiSU commit information
         run: |
-          case "${{ inputs.kernelsu_variant }}" in
-            "Official") BRANCH="main" ;;
-            "SukiSU")
-              if [ "${{ inputs.cancel_susfs }}" = "true" ]; then
-                BRANCH="main"
-              else
-                BRANCH="builtin"
-              fi
-              ;;
-            "ReSukiSU") BRANCH="main" ;;
-            "Next") BRANCH="dev" ;;
-            *) echo "错误: 未知变体" >&2; exit 1 ;;
-          esac
-          echo "KSU_BRANCH=$BRANCH" >> $GITHUB_ENV
-          echo "BRANCH_INFO=$BRANCH" >> $GITHUB_ENV
-
-      # ==================== 获取 KernelSU 提交信息 ====================
-      # 获取当前使用的 KernelSU 版本的 Git 提交信息
-      - name: 获取 KernelSU 提交信息
-        run: |
-          case "${{ inputs.kernelsu_variant }}" in
-            "Official") REPO_URL="https://github.com/tiann/KernelSU.git"; REPO_URL2="tiann/KernelSU" ;;
-            "Next") REPO_URL="https://github.com/KernelSU-Next/KernelSU-Next.git"; REPO_URL2="KernelSU-Next/KernelSU-Next" ;;
-            "SukiSU") REPO_URL="https://github.com/SukiSU-Ultra/SukiSU-Ultra.git"; REPO_URL2="SukiSU-Ultra/SukiSU-Ultra" ;;
-            "ReSukiSU") REPO_URL="https://github.com/ReSukiSU/ReSukiSU.git"; REPO_URL2="ReSukiSU/ReSukiSU" ;;
-          esac
-
-          if [ "${{ inputs.kernelsu_variant }}" = "SukiSU" ] && [ -f "config/config" ]; then
-            CUSTOM_ENABLED=$(grep "^custom=" config/config | cut -d'=' -f2)
-            CUSTOM_COMMIT=$(grep "^sukisu=" config/config | cut -d'=' -f2)
-            if [ "$CUSTOM_ENABLED" = "true" ] && [ -n "$CUSTOM_COMMIT" ]; then
-              KSU_REF="$CUSTOM_COMMIT"
-              KSU_URL="https://github.com/$REPO_URL2/commit/$CUSTOM_COMMIT"
-              echo "BRANCH_INFO=custom" >> $GITHUB_ENV
-            fi
+          BRANCH="${{ inputs.kittisu_branch }}"
+          COMMIT_HASH=$(git ls-remote https://github.com/terebiko/KittiSU.git "refs/heads/$BRANCH" | awk '{print $1}')
+          test -n "$COMMIT_HASH" || { echo "::error::KittiSU branch '$BRANCH' does not exist."; exit 1; }
+          if [ -f config/config ] && [ "$(grep '^custom=' config/config | cut -d= -f2-)" = true ]; then
+            PIN=$(grep '^kittisu=' config/config | cut -d= -f2-)
+            [ -n "$PIN" ] && COMMIT_HASH="$PIN"
           fi
-
-          if [ -z "${KSU_REF:-}" ]; then
-            COMMIT_HASH=$(git ls-remote $REPO_URL refs/heads/${KSU_BRANCH:-main} | awk '{ print $1 }')
-            KSU_REF=$COMMIT_HASH
-            KSU_URL="https://github.com/$REPO_URL2/commit/$COMMIT_HASH"
-          fi
-
-          echo "KSU_REF=$KSU_REF" >> $GITHUB_ENV
-          echo "KSU_URL=$KSU_URL" >> $GITHUB_ENV
+          echo "KSU_BRANCH=$BRANCH" >> "$GITHUB_ENV"
+          echo "BRANCH_INFO=$BRANCH" >> "$GITHUB_ENV"
+          echo "KSU_REF=$COMMIT_HASH" >> "$GITHUB_ENV"
+          echo "KSU_URL=https://github.com/terebiko/KittiSU/commit/$COMMIT_HASH" >> "$GITHUB_ENV"
 
       # ==================== 获取 SUSFS 提交信息 ====================
       # 获取各版本 SUSFS 的 Git 提交信息

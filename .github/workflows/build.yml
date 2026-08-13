@@ -21,10 +21,11 @@ on:
         required: true
         type: string
 
-      # ==================== KernelSU 配置 ====================
-      ksu_variant:
-        required: true
+      # KittiSU configuration
+      kittisu_branch:
+        required: false
         type: string
+        default: main
 
       # ==================== 可选配置 ====================
       version:
@@ -83,7 +84,7 @@ on:
 
 jobs:
   build-kernel:
-    name: "${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.android_version }}-${{ inputs.os_patch_level }}-${{ inputs.ksu_variant }}"
+    name: "${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.android_version }}-${{ inputs.os_patch_level }}-KittiSU"
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -102,7 +103,7 @@ jobs:
           echo "内核版本      : ${{ inputs.kernel_version }}"
           echo "子版本号      : ${{ inputs.sub_level }}"
           echo "补丁级别      : ${{ inputs.os_patch_level }}"
-          echo "KSU 变体      : ${{ inputs.ksu_variant }}"
+          echo "KittiSU branch: ${{ inputs.kittisu_branch }}"
           echo "构建时间      : ${{ inputs.build_time }}"
           echo "SUSFS 状态    : ${{ inputs.enable_susfs }}"
           echo "ZRAM 增强     : ${{ inputs.use_zram }}"
@@ -140,24 +141,13 @@ jobs:
           KERNEL_ROOT="$GITHUB_WORKSPACE/$CONFIG"
           mkdir -p "$KERNEL_ROOT"
 
-          LEGACY_SUKISU_CONFIG=""
-          case "${{ inputs.ksu_variant }}" in
-            SukiSU\(*\)) LEGACY_SUKISU_CONFIG="$GITHUB_WORKSPACE/config/${{ inputs.ksu_variant }}.config" ;;
-          esac
-
-          if [ -n "$LEGACY_SUKISU_CONFIG" ] && [ ! -f "$LEGACY_SUKISU_CONFIG" ]; then
-            echo "未找到 ${{ inputs.ksu_variant }} 固定提交配置: $LEGACY_SUKISU_CONFIG" >&2
-            exit 1
-          fi
-
           cat >> $GITHUB_ENV << EOF
           CONFIG=$CONFIG
           KERNEL_ROOT=$KERNEL_ROOT
-          LEGACY_SUKISU_CONFIG=$LEGACY_SUKISU_CONFIG
           DEFCONFIG=$KERNEL_ROOT/common/arch/arm64/configs/gki_defconfig
           SUSFS4KSU=$GITHUB_WORKSPACE/susfs4ksu
           KERNEL_PATCHES=$GITHUB_WORKSPACE/kernel_patches
-          SUKISU_PATCHES=$GITHUB_WORKSPACE/SukiSU_patch
+          KITTISU_PATCHES=$GITHUB_WORKSPACE/KittiSU_patch
           ZZH_PATCHES=$GITHUB_WORKSPACE
           ANYKERNEL3=$GITHUB_WORKSPACE/AnyKernel3
           ACTION_BUILD=$GITHUB_WORKSPACE/Action-Build
@@ -179,10 +169,6 @@ jobs:
           if [ -f "$CONFIG_FILE" ]; then
             echo "加载配置文件: $CONFIG_FILE"
             cat "$CONFIG_FILE"
-          fi
-          if [ -n "$LEGACY_SUKISU_CONFIG" ]; then
-            echo "加载老版 SukiSU 固定提交配置: $LEGACY_SUKISU_CONFIG"
-            cat "$LEGACY_SUKISU_CONFIG"
           fi
 
       - name: 安装编译依赖
@@ -242,29 +228,10 @@ jobs:
           rm -rf AnyKernel3/.git
 
           echo "克隆 SUSFS (分支: $SUSFS_BRANCH)..."
-          if [ -n "$LEGACY_SUKISU_CONFIG" ]; then
-            git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
-          elif [ "${{ inputs.ksu_variant }}" == "SukiSU" ]; then
-            if ! git clone https://github.com/ShirkNeko/susfs4ksu.git -b "$SUSFS_BRANCH" 2>/dev/null; then
-              echo "ShirkNeko 仓库未找到分支 $SUSFS_BRANCH，回退到 simonpunk 原版..."
-              git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
-            fi
-          else
-            git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
-          fi
-
-          if [ -n "$LEGACY_SUKISU_CONFIG" ]; then
-            SUSFS_FIXED_COMMIT=$(grep "^${SUSFS_BRANCH}=" "$LEGACY_SUKISU_CONFIG" | cut -d'=' -f2-)
-            if [ -z "$SUSFS_FIXED_COMMIT" ]; then
-              echo "未在 $LEGACY_SUKISU_CONFIG 配置 $SUSFS_BRANCH 的固定 SUSFS 提交" >&2
-              exit 1
-            fi
-            echo "${{ inputs.ksu_variant }} 固定 SUSFS 提交: $SUSFS_FIXED_COMMIT"
-            git -C susfs4ksu checkout "$SUSFS_FIXED_COMMIT"
-          fi
+          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
 
           CONFIG_FILE="config/config"
-          if [ -z "$LEGACY_SUKISU_CONFIG" ] && [ -f "$CONFIG_FILE" ]; then
+          if [ -f "$CONFIG_FILE" ]; then
             CUSTOM_ENABLED=$(grep "^custom=" "$CONFIG_FILE" | cut -d'=' -f2)
             if [ "$CUSTOM_ENABLED" == "true" ]; then
               CUSTOM_COMMIT=$(grep "^${SUSFS_BRANCH}=" "$CONFIG_FILE" | cut -d'=' -f2)
@@ -283,7 +250,7 @@ jobs:
 
           echo "准备补丁资源..."
           git clone https://github.com/WildKernels/kernel_patches.git
-          git clone https://github.com/ShirkNeko/SukiSU_patch.git
+          git clone https://github.com/ShirkNeko/SukiSU_patch.git KittiSU_patch
           echo "使用当前仓库补丁目录: $ZZH_PATCHES"
           git clone https://github.com/Numbersf/Action-Build.git --depth=1
 
@@ -400,154 +367,44 @@ jobs:
           curl -LSs "https://github.com/zzh20188/GKI_KernelSU_SUSFS/raw/refs/heads/dev/hmbird_patch.c" -o hmbird_patch.c
           echo "obj-y += hmbird_patch.o" >> Makefile
 
-      - name: 确定 KernelSU 分支
-        id: ksu-branch
+      - name: Validate and select KittiSU branch
+        id: kittisu-branch
         run: |
-          variant_input="${{ inputs.ksu_variant }}"
+          KITTISU_BRANCH="${{ inputs.kittisu_branch }}"
+          if [ -z "$KITTISU_BRANCH" ] || ! git ls-remote --exit-code --heads https://github.com/terebiko/KittiSU.git "$KITTISU_BRANCH" >/dev/null; then
+            echo "::error::KittiSU branch '$KITTISU_BRANCH' does not exist in terebiko/KittiSU." >&2
+            exit 1
+          fi
 
-          case "$variant_input" in
-            "Official"|"ReSukiSU")
-              BRANCH="-s main"
-              ;;
-            "SukiSU")
-              if [ "${{ inputs.enable_susfs }}" = "false" ]; then
-                BRANCH="-s main"
-              else
-                BRANCH="-s builtin"
-              fi
-              ;;
-            "Next")
-              BRANCH=""
-              ;;
-            *)
-              if [ -z "$LEGACY_SUKISU_CONFIG" ] || [ ! -f "$LEGACY_SUKISU_CONFIG" ]; then
-                echo "未知变体: $variant_input" >&2
-                exit 1
-              fi
-              SUKISU_FIXED_COMMIT=$(grep "^sukisu=" "$LEGACY_SUKISU_CONFIG" | cut -d'=' -f2-)
-              if [ -z "$SUKISU_FIXED_COMMIT" ]; then
-                echo "未在 $LEGACY_SUKISU_CONFIG 配置 SukiSU 固定提交" >&2
-                exit 1
-              fi
-              BRANCH="-s $SUKISU_FIXED_COMMIT"
-              ;;
-          esac
-
-          # 检查自定义提交 (仅对 SukiSU 生效)
+          KITTISU_COMMIT=""
           CONFIG_FILE="config/config"
           if [ -f "$CONFIG_FILE" ]; then
             CUSTOM_ENABLED=$(grep "^custom=" "$CONFIG_FILE" | cut -d'=' -f2)
-            if [ "$CUSTOM_ENABLED" == "true" ] && [ "$variant_input" == "SukiSU" ]; then
-              SUKISU_COMMIT=$(grep "^sukisu=" "$CONFIG_FILE" | cut -d'=' -f2)
-              if [ -n "$SUKISU_COMMIT" ]; then
-                BRANCH="-s $SUKISU_COMMIT"
-                echo "SukiSU 使用自定义提交: $SUKISU_COMMIT"
-              fi
+            if [ "$CUSTOM_ENABLED" = "true" ]; then
+              KITTISU_COMMIT=$(grep "^kittisu=" "$CONFIG_FILE" | cut -d'=' -f2-)
             fi
           fi
 
-          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
-          echo "KSU 分支: $BRANCH"
+          echo "KITTISU_BRANCH=$KITTISU_BRANCH" >> "$GITHUB_ENV"
+          echo "KITTISU_COMMIT=$KITTISU_COMMIT" >> "$GITHUB_ENV"
+          echo "KittiSU branch: $KITTISU_BRANCH"
 
-      - name: 添加 KernelSU
+      - name: Add KittiSU
         working-directory: ${{ env.KERNEL_ROOT }}
         run: |
-          case "${{ inputs.ksu_variant }}" in
-            "Official")
-              echo "添加 KernelSU 官方版..."
-              curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash $BRANCH
-
-              cd KernelSU
-              KSU_GIT_VERSION=$(git rev-list --count HEAD)
-              KSU_VERSION=$((20000 + KSU_GIT_VERSION))
-              echo "KSU_VERSION=$KSU_VERSION" >> $GITHUB_ENV
-
-              if [ -f "kernel/Kbuild" ]; then
-                sed -i "s/DKSU_VERSION=16/DKSU_VERSION=${KSU_VERSION}/" kernel/Kbuild
-              fi
-              cd ..
-              ;;
-            "Next")
-              echo "添加 KernelSU-Next..."
-              curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/refs/heads/dev/kernel/setup.sh" | bash -s dev_susfs
-              ;;
-            "SukiSU")
-              echo "添加 ${{ inputs.ksu_variant }}..."
-              curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash $BRANCH
-              ;;
-            "ReSukiSU")
-              echo "添加 ReSukiSU..."
-              curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash $BRANCH
-              ;;
-            *)
-              if [ -z "$LEGACY_SUKISU_CONFIG" ]; then
-                echo "未知变体: ${{ inputs.ksu_variant }}" >&2
-                exit 1
-              fi
-              echo "添加 ${{ inputs.ksu_variant }}..."
-              curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash $BRANCH
-              ;;
-          esac
-
-          if [ -d "KernelSU/.git" ]; then
-            KSU_LATEST_COMMIT_DATE=$(git -C KernelSU log -1 --date=format:'%Y-%m-%d %H:%M:%S %z' --format='%cd')
-            echo "KSU_LATEST_COMMIT_DATE=$KSU_LATEST_COMMIT_DATE" >> $GITHUB_ENV
-          else
-            echo "KSU_LATEST_COMMIT_DATE=未知" >> $GITHUB_ENV
+          git clone --branch "$KITTISU_BRANCH" https://github.com/terebiko/KittiSU.git KernelSU
+          if [ -n "$KITTISU_COMMIT" ]; then
+            git -C KernelSU fetch origin "$KITTISU_COMMIT" || { echo "::error::Invalid KittiSU commit pin: $KITTISU_COMMIT"; exit 1; }
+            git -C KernelSU checkout --detach "$KITTISU_COMMIT"
           fi
-
-      - name: 配置 SukiSU 管理器信息
-        if: inputs.ksu_variant == 'SukiSU' || inputs.ksu_variant == 'SukiSU(40726)' || inputs.ksu_variant == 'SukiSU(40548)'
-        working-directory: ${{ env.KERNEL_ROOT }}/KernelSU
-        run: |
-          KBUILD_FILE="./kernel/Kbuild"
-          CUSTOM_TAG="${{ vars.MANAGER_STR }}"
-
-          if [ ! -f "$KBUILD_FILE" ]; then
-            echo "未找到 $KBUILD_FILE，跳过 SukiSU 版本标识定制"
-            exit 0
-          fi
-
-          GIT_HASH=$(git rev-parse --short=8 HEAD)
-          BRANCH_NAME="${BRANCH#-s }"
-          if [ -z "$BRANCH_NAME" ] || [ "$BRANCH_NAME" = "$BRANCH" ]; then
-            BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
-          fi
-
-          if [ -n "$CUSTOM_TAG" ]; then
-            VERSION_TEMPLATE="v\$1-$CUSTOM_TAG@$BRANCH_NAME[$GIT_HASH]"
-          else
-            VERSION_TEMPLATE="v\$1-$GIT_HASH@$BRANCH_NAME"
-          fi
-
-          awk -v body="$VERSION_TEMPLATE" '
-            BEGIN {
-              in_block = 0
-              replaced = 0
-            }
-            /^[[:space:]]*define get_ksu_version_full$/ {
-              print
-              print body
-              in_block = 1
-              replaced = 1
-              next
-            }
-            in_block && /^[[:space:]]*endef$/ {
-              print
-              in_block = 0
-              next
-            }
-            !in_block {
-              print
-            }
-            END {
-              if (!replaced) {
-                exit 1
-              }
-            }
-          ' "$KBUILD_FILE" > "${KBUILD_FILE}.tmp" && mv "${KBUILD_FILE}.tmp" "$KBUILD_FILE"
-
-          echo "已更新 get_ksu_version_full 模板: $VERSION_TEMPLATE"
+          DRIVER_DIR="$KERNEL_ROOT/common/drivers"
+          ln -sf "$(realpath --relative-to="$DRIVER_DIR" "$KERNEL_ROOT/KernelSU/kernel")" "$DRIVER_DIR/kernelsu"
+          grep -q 'kernelsu' "$DRIVER_DIR/Makefile" || printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> "$DRIVER_DIR/Makefile"
+          grep -q 'source "drivers/kernelsu/Kconfig"' "$DRIVER_DIR/Kconfig" || sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' "$DRIVER_DIR/Kconfig"
+          KSU_GIT_VERSION=$(git -C KernelSU rev-list --count HEAD)
+          echo "KSU_VERSION=$((30700 + KSU_GIT_VERSION))" >> "$GITHUB_ENV"
+          echo "KITTISU_COMMIT_SHA=$(git -C KernelSU rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "KSU_LATEST_COMMIT_DATE=$(git -C KernelSU log -1 --date=format:'%Y-%m-%d %H:%M:%S %z' --format='%cd')" >> "$GITHUB_ENV"
 
       - name: 应用 SUSFS 补丁
         if: inputs.enable_susfs
@@ -560,23 +417,7 @@ jobs:
           cp $SUSFS4KSU/kernel_patches/fs/* ./common/fs/
           cp $SUSFS4KSU/kernel_patches/include/linux/* ./common/include/linux/
 
-          case "${{ inputs.ksu_variant }}" in
-            "Official")
-              cd ./KernelSU
-              cp $SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-              # 兼容旧版补丁：仅当补丁仍只修改 kernel/Makefile 时，才替换为 kernel/Kbuild
-              if grep -q '^diff --git a/kernel/Makefile b/kernel/Makefile' ./10_enable_susfs_for_ksu.patch \
-                && ! grep -q '^diff --git a/kernel/Kbuild b/kernel/Kbuild' ./10_enable_susfs_for_ksu.patch; then
-                sed -i 's|kernel/Makefile|kernel/Kbuild|g' ./10_enable_susfs_for_ksu.patch
-              fi
-              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
-
-              cd ..
-              ;;
-            "Next"|"SukiSU"|"SukiSU(40726)"|"SukiSU(40548)"|"ReSukiSU")
-              echo "Next/SukiSU/SukiSU(40726)/SukiSU(40548)/ReSukiSU 使用内置 SUSFS 支持"
-              ;;
-          esac
+          echo "KittiSU uses built-in SUSFS support"
 
           cd $KERNEL_ROOT/common
           CURRENT_SUB="${{ inputs.sub_level }}"
@@ -744,7 +585,7 @@ jobs:
             fi
           fi
 
-          if [ "${{ inputs.ksu_variant }}" == "Official" ] || [ "${{ inputs.ksu_variant }}" == "Next" ] || [ "${{ inputs.ksu_variant }}" == "SukiSU" ] || [ "${{ inputs.ksu_variant }}" == "SukiSU(40726)" ] || [ "${{ inputs.ksu_variant }}" == "SukiSU(40548)" ] || [ "${{ inputs.ksu_variant }}" == "ReSukiSU" ]; then
+          if [ -d "$KERNEL_ROOT/KernelSU" ]; then
             fix_namespace_susfs_mount_decls() {
               local label="$1"
               local marker_pattern="$2"
@@ -844,22 +685,6 @@ jobs:
                   sed -i '/#include <linux\/zswap.h>/a #ifdef CONFIG_KSU_SUSFS_SUS_MAP\n#include <linux\/susfs_def.h>\n#endif' ./mm/memory.c
                 else
                   sed -i '/#include <linux\/sched\/sysctl.h>/a #ifdef CONFIG_KSU_SUSFS_SUS_MAP\n#include <linux\/susfs_def.h>\n#endif' ./mm/memory.c
-                fi
-              fi
-              # 修复老版 SukiSU 6.6.50~6.6.58: task_mmu.c 打入 SUSFS 后使用 vma，但旧源码没有对应声明
-              if [[ -n "$LEGACY_SUKISU_CONFIG" && "$CURRENT_SUB" -ge 50 && "$CURRENT_SUB" -le 58 ]] \
-                && grep -qF 'vma = find_vma(mm, start_vaddr);' ./fs/proc/task_mmu.c; then
-                TASK_MMU_PATCH="$KERNEL_PATCHES/wild/archived/susfs_fix_patches/v2.1.0/a15-6.6/task_mmu.c.patch"
-                if [ ! -f "$TASK_MMU_PATCH" ]; then
-                  echo "::error::补丁不存在: $TASK_MMU_PATCH"
-                  exit 1
-                fi
-                cp "$TASK_MMU_PATCH" ./
-                if patch -p1 --dry-run < task_mmu.c.patch >/dev/null 2>&1; then
-                  patch -p1 --no-backup-if-mismatch < task_mmu.c.patch
-                  echo "已应用 Android 15 6.6.50~6.6.58 task_mmu.c 归档修复补丁"
-                else
-                  echo "Android 15 6.6.50~6.6.58 task_mmu.c 归档修复补丁已应用或当前上下文不匹配，跳过"
                 fi
               fi
 
@@ -1098,17 +923,17 @@ jobs:
             echo "f2fs-\$(CONFIG_F2FS_IOSTAT) += iostat.o" >> "fs/f2fs/Makefile"
           fi
 
-          cp -r $SUKISU_PATCHES/other/zram/lz4k/include/linux/* ./include/linux/
-          cp -r $SUKISU_PATCHES/other/zram/lz4k/lib/* ./lib/
-          cp -r $SUKISU_PATCHES/other/zram/lz4k/crypto/* ./crypto/
-          cp -r $SUKISU_PATCHES/other/zram/lz4k_oplus ./lib/
+          cp -r $KITTISU_PATCHES/other/zram/lz4k/include/linux/* ./include/linux/
+          cp -r $KITTISU_PATCHES/other/zram/lz4k/lib/* ./lib/
+          cp -r $KITTISU_PATCHES/other/zram/lz4k/crypto/* ./crypto/
+          cp -r $KITTISU_PATCHES/other/zram/lz4k_oplus ./lib/
 
-          cp $SUKISU_PATCHES/other/zram/zram_patch/${{ inputs.kernel_version }}/lz4kd.patch ./
+          cp $KITTISU_PATCHES/other/zram/zram_patch/${{ inputs.kernel_version }}/lz4kd.patch ./
           if ! patch -p1 -F 3 < lz4kd.patch; then
             echo "::warning::lz4kd.patch 应用失败，可能已应用或上下文不匹配"
           fi
 
-          cp $SUKISU_PATCHES/other/zram/zram_patch/${{ inputs.kernel_version }}/lz4k_oplus.patch ./
+          cp $KITTISU_PATCHES/other/zram/zram_patch/${{ inputs.kernel_version }}/lz4k_oplus.patch ./
           if ! patch -p1 -F 3 < lz4k_oplus.patch; then
             echo "::warning::lz4k_oplus.patch 应用失败，可能已应用或上下文不匹配"
           fi
@@ -1253,34 +1078,17 @@ jobs:
           CONFIG_TMPFS_POSIX_ACL=y
           EOF
 
-          if [ "${{ inputs.ksu_variant }}" == "SukiSU" ] || [ "${{ inputs.ksu_variant }}" == "SukiSU(40726)" ] || [ "${{ inputs.ksu_variant }}" == "SukiSU(40548)" ] || [ "${{ inputs.ksu_variant }}" == "ReSukiSU" ] || [ "${{ inputs.ksu_variant }}" == "Next" ]; then
-            if [[ "${{ inputs.use_kpm }}" == enabled* ]] || [[ "${{ inputs.use_kpm }}" == patched* ]]; then
-              if ! grep -RqsE '^[[:space:]]*config[[:space:]]+KPM([[:space:]]|$)' common KernelSU 2>/dev/null; then
-                echo "错误: 已请求启用 KPM，但当前 KernelSU 代码未声明 CONFIG_KPM" >&2
-                exit 1
-              fi
-              echo "CONFIG_KPM=y" >> "$DEFCONFIG"
+          if [[ "${{ inputs.use_kpm }}" == enabled* ]] || [[ "${{ inputs.use_kpm }}" == patched* ]]; then
+            if ! grep -RqsE '^[[:space:]]*config[[:space:]]+KPM([[:space:]]|$)' common KernelSU 2>/dev/null; then
+              echo "KPM was requested, but KittiSU does not declare CONFIG_KPM" >&2
+              exit 1
             fi
+            echo "CONFIG_KPM=y" >> "$DEFCONFIG"
           fi
 
           CURRENT_SUB="${{ inputs.sub_level }}"
           if [[ ! "$CURRENT_SUB" =~ ^[0-9]+$ ]]; then
             CURRENT_SUB=99999
-          fi
-          if [[ "${{ inputs.ksu_variant }}" == "ReSukiSU" && "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" && "$CURRENT_SUB" -ge 74 && "$CURRENT_SUB" -le 137 ]]; then
-            {
-              echo "CONFIG_KALLSYMS=y"
-              echo "CONFIG_KALLSYMS_ALL=y"
-            } >> "$DEFCONFIG"
-            # 修复 5.15.74~5.15.137: kallsyms_on_each_symbol 仅在 LIVEPATCH 下编译，导致 ReSukiSU 链接失败
-            KALLSYMS_C="./common/kernel/kallsyms.c"
-            if [ -f "$KALLSYMS_C" ] \
-              && grep -qF 'int kallsyms_on_each_symbol' "$KALLSYMS_C" \
-              && grep -qF '#endif /* CONFIG_LIVEPATCH */' "$KALLSYMS_C"; then
-              sed -i '/^#ifdef CONFIG_LIVEPATCH$/,/^int kallsyms_on_each_symbol/ { /^#ifdef CONFIG_LIVEPATCH$/d }' "$KALLSYMS_C"
-              sed -i '/^int kallsyms_on_each_symbol/,/^#endif \/\* CONFIG_LIVEPATCH \*\// { /^#endif \/\* CONFIG_LIVEPATCH \*\//d }' "$KALLSYMS_C"
-              echo "已修复 kallsyms_on_each_symbol 的 LIVEPATCH 编译限制"
-            fi
           fi
 
           sed -i 's/check_defconfig//' ./common/build.config.gki
@@ -1428,26 +1236,6 @@ jobs:
             echo "当前 SUSFS 最新提交日期: ${SUSFS_LATEST_COMMIT_DATE}"
             echo "如果日期不同或相差过远则补丁失效、编译失败"
 
-      # - name: 应用 KPM 补丁 (SukiSU/ReSukiSU/Next)
-      #   if: startsWith(inputs.use_kpm, 'patched') && (inputs.ksu_variant == 'SukiSU' || inputs.ksu_variant == 'ReSukiSU' || inputs.ksu_variant == 'Next')
-      #   run: |
-      #     case "${{ inputs.android_version }}" in
-      #       "android12"|"android13")
-      #         if [ "${{ inputs.kernel_version }}" != "6.6" ]; then
-      #           TARGET_PATH="$KERNEL_ROOT/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist"
-      #         fi
-      #         ;;
-      #       "android14"|"android15"|"android16")
-      #         TARGET_PATH="$KERNEL_ROOT/bazel-bin/common/kernel_aarch64/"
-      #         ;;
-      #     esac
-
-      #     cp -r $SUKISU_PATCHES/kpm/patch_linux "$TARGET_PATH/patch"
-      #     cd "$TARGET_PATH"
-      #     chmod 777 patch
-      #     ./patch
-      #     rm -rf Image
-      #     mv oImage Image
 
       - name: 准备 Boot 镜像
         run: |
@@ -1557,7 +1345,7 @@ jobs:
         if: inputs.artifact_upload_mode != '上传全部'
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ inputs.ksu_variant }}_kernel-${{ env.CONFIG }}-AnyKernel3
+          name: KittiSU_kernel-${{ env.CONFIG }}-AnyKernel3
           path: AnyKernel3/*
           compression-level: 9
 
@@ -1565,7 +1353,7 @@ jobs:
         if: inputs.artifact_upload_mode == '上传全部'
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ inputs.ksu_variant }}_kernel-${{ env.CONFIG }}
+          name: KittiSU_kernel-${{ env.CONFIG }}
           path: |
             *AnyKernel3.zip
             *.img
@@ -1575,7 +1363,7 @@ jobs:
         if: always() && env.REJ_COUNT > 0
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ inputs.ksu_variant }}_kernel-${{ env.CONFIG }}-Rejects
+          name: KittiSU_kernel-${{ env.CONFIG }}-Rejects
           path: patch-rejects/
           if-no-files-found: ignore
           compression-level: 9

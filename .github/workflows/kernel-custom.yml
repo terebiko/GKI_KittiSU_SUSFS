@@ -25,19 +25,12 @@ on:
         type: string
         default: "2022-01"
 
-      # ==================== KernelSU 配置 ====================
-      kernelsu_variant:
-        description: "KernelSU 变体"
-        required: true
-        type: choice
-        options:
-          - Official
-          #- Next
-          - SukiSU
-          - SukiSU(40726)
-          - SukiSU(40548)
-          - ReSukiSU
-        default: ReSukiSU
+      # KittiSU configuration
+      kittisu_branch:
+        description: "KittiSU branch"
+        required: false
+        type: string
+        default: main
 
       # ==================== 可选配置 ====================
       version:
@@ -202,7 +195,7 @@ jobs:
       sub_level: ${{ needs.resolve-version.outputs.sub_level }}
       os_patch_level: ${{ inputs.os_patch_level }}
       revision: "r1"
-      ksu_variant: ${{ inputs.kernelsu_variant }}
+      kittisu_branch: ${{ inputs.kittisu_branch }}
       version: ${{ inputs.version || '' }}
       build_time: ${{ inputs.build_time || '' }}
       use_zram: ${{ inputs.use_zram }}
@@ -220,4 +213,4 @@ jobs:
     uses: ./.github/workflows/get-manager.yml
     secrets: inherit
     with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kittisu_branch: ${{ inputs.kittisu_branch }}

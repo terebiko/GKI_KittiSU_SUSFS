@@ -7,18 +7,11 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
-      kernelsu_variant:
-        description: "KernelSU 变体"
-        required: true
-        type: choice
-        options:
-          - Official
-          #- Next
-          - SukiSU
-          - SukiSU(40726)
-          - SukiSU(40548)
-          - ReSukiSU
-        default: ReSukiSU
+      kittisu_branch:
+        description: "KittiSU branch"
+        required: false
+        type: string
+        default: main
       version:
         description: "自定义版本名 (可选)"
         required: false
@@ -90,9 +83,10 @@ on:
         default: false
   workflow_call:
     inputs:
-      kernelsu_variant:
-        required: true
+      kittisu_branch:
+        required: false
         type: string
+        default: main
       version:
         required: false
         type: string
@@ -165,7 +159,7 @@ jobs:
       kernel_version: "6.12"
       sub_level: ${{ matrix.sub_level }}
       os_patch_level: ${{ matrix.os_patch_level }}
-      ksu_variant: ${{ inputs.kernelsu_variant }}
+      kittisu_branch: ${{ inputs.kittisu_branch }}
       version: ${{ inputs.version || '' }}
       build_time: ${{ inputs.build_time || '' }}
       use_zram: false
@@ -185,4 +179,4 @@ jobs:
     uses: ./.github/workflows/get-manager.yml
     secrets: inherit
     with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kittisu_branch: ${{ inputs.kittisu_branch }}

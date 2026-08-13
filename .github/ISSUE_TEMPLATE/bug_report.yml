@@ -1,26 +1,26 @@
-name: "Bug Report / 问题反馈"
-description: "Report a bug / 报告问题"
+name: "Bug Report"
+description: "Report a bug"
 labels: ["bug"]
 
 body:
   - type: markdown
     attributes:
       value: |
-        **Please fill in the following information / 请填写以下信息**
+        **Please fill in the following information.**
 
   - type: textarea
     id: description
     attributes:
-      label: "Bug Description / 问题描述"
-      description: "Describe the bug clearly / 清晰描述问题"
+      label: "Bug Description"
+      description: "Describe the bug clearly."
     validations:
       required: true
 
   - type: textarea
     id: reproduce
     attributes:
-      label: "Steps to Reproduce / 复现步骤"
-      description: "How to reproduce this issue / 如何复现此问题"
+      label: "Steps to Reproduce"
+      description: "How to reproduce this issue."
       placeholder: |
         1. ...
         2. ...
@@ -29,20 +29,20 @@ body:
   - type: textarea
     id: device
     attributes:
-      label: "Device Info / 设备信息"
-      description: "Your device and kernel info / 设备与内核信息"
+      label: "Device Info"
+      description: "Your device and kernel information."
       value: |
-        - Device / 设备:
-        - Android Version / 安卓版本:
-        - Kernel Version / 内核版本:
-        - KernelSU Version / KernelSU版本:
-        - SUSFS Version / SUSFS版本:
+        - Device:
+        - Android Version:
+        - Kernel Version:
+        - KittiSU Version:
+        - SUSFS Version:
     validations:
       required: true
 
   - type: textarea
     id: logs
     attributes:
-      label: "Logs / 日志"
-      description: "Relevant logs or screenshots / 相关日志或截图"
+      label: "Logs"
+      description: "Relevant logs or screenshots."
       render: shell
