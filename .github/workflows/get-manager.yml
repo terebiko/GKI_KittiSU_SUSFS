@@ -61,20 +61,20 @@ jobs:
           LATEST_RUN=""
           LATEST_ARTIFACTS=""
           for PAGE in $(seq 1 10); do
-            RUNS=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/terebiko/KittiSU/actions/workflows/build-manager.yml/runs?branch=$KITTISU_BRANCH&status=success&per_page=100&page=$PAGE")
+            RUNS=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/terebiko/KittiSU/actions/workflows/build-manager.yml/runs?status=success&per_page=100&page=$PAGE")
             COUNT=$(printf '%s' "$RUNS" | jq '.workflow_runs | length')
             [ "$COUNT" -eq 0 ] && break
             for INDEX in $(seq 0 $((COUNT - 1))); do
               RUN_ID=$(printf '%s' "$RUNS" | jq -r ".workflow_runs[$INDEX].id")
               ARTIFACTS=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/terebiko/KittiSU/actions/runs/$RUN_ID/artifacts")
-              MATCHES=$(printf '%s' "$ARTIFACTS" | jq -r '.artifacts[] | select(.name == "Manager-gradle-release" or .name == "Spoofed-Manager-gradle-release") | "\(.name)\t\(.archive_download_url)"')
+              MATCHES=$(printf '%s' "$ARTIFACTS" | jq -r '.artifacts[] | select(.name == "Manager-release" or .name == "Spoofed-Manager-release") | "\(.name)\t\(.archive_download_url)"')
               [ -z "$MATCHES" ] && continue
               LATEST_RUN=$RUN_ID
               LATEST_ARTIFACTS=$MATCHES
               break 2
             done
           done
-          [ -n "$LATEST_ARTIFACTS" ] || { echo "::error::No successful KittiSU Manager artifact found for branch $KITTISU_BRANCH."; exit 1; }
+          [ -n "$LATEST_ARTIFACTS" ] || { echo "::error::No successful KittiSU Manager artifact found."; exit 1; }
           echo "Using latest KittiSU Manager run $LATEST_RUN."
           while IFS=$'\t' read -r NAME URL; do
             SAFE_NAME=$(echo "$NAME" | tr '/ ' '__')
