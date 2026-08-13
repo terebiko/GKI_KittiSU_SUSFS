@@ -13,25 +13,25 @@ on:
         type: string
         default: main
       version:
-        description: "自定义版本名 (可选)"
+        description: "Custom version name (optional)"
         required: false
         type: string
       build_time:
-        description: "自定义构建时间 (可选，N或留空=当前UTC)"
+        description: "Custom build time (optional; N or blank uses current UTC)"
         required: false
         type: string
         default: "Sun Dec 01 08:10:00 UTC 2024"
       use_kpm:
-        description: "KPM 功能（patched 尚不支持）"
+        description: "KPM support (patched is not supported yet)"
         required: true
         type: choice
-        default: "disabled (关闭)"
+        default: "disabled (off)"
         options:
-          - "disabled (关闭)"
-          - "enabled (开启)"
-          - "patched (开启并修补，尚不支持)"
+          - "disabled (off)"
+          - "enabled (on)"
+          - "patched (on; patching not supported yet)"
       droidspaces:
-        description: "Droidspaces 容器支持"
+        description: "Droidspaces container support"
         required: false
         type: choice
         options:
@@ -41,40 +41,40 @@ on:
           - "345"
         default: "off"
       artifact_upload_mode:
-        description: "构建产物上传模式"
+        description: "Artifact upload mode"
         required: true
         type: choice
         options:
-          - "仅上传 AnyKernel3.zip"
-          - "上传全部"
-        default: "仅上传 AnyKernel3.zip"
+          - "AnyKernel3.zip only"
+          - "Upload all"
+        default: "AnyKernel3.zip only"
       droidspaces_ntsync:
-        description: "启用 Droidspaces 容器 NTSync 支持（需启用 Droidspaces）"
+        description: "Enable Droidspaces NTSync support (requires Droidspaces)"
         required: false
         type: boolean
         default: false
       use_zram:
-        description: "启用 ZRAM 增强算法"
+        description: "Enable ZRAM enhancements"
         required: true
         type: boolean
         default: false
       use_bbg:
-        description: "启用 BBG 防格机"
+        description: "Enable BBG anti-freeze"
         required: true
         type: boolean
         default: false
       use_rekernel:
-        description: "启用 Re-Kernel 驱动"
+        description: "Enable Re-Kernel driver"
         required: false
         type: boolean
         default: false
       cve_2026_43499_patch:
-        description: "应用 CVE-2026-43499 rtmutex 修复链"
+        description: "Apply CVE-2026-43499 rtmutex fix chain"
         required: false
         type: boolean
         default: false
       cancel_susfs:
-        description: "禁用 SUSFS"
+        description: "Disable SUSFS"
         required: true
         type: boolean
         default: false
@@ -118,13 +118,13 @@ on:
       artifact_upload_mode:
         required: false
         type: string
-        default: "上传全部"
+        default: "Upload all"
       droidspaces_ntsync:
         required: false
         type: boolean
         default: false
       called_from_main:
-        description: "是否从 main.yml 调用（内部使用）"
+        description: "Called from main.yml (internal use)"
         required: false
         type: boolean
         default: false

@@ -7,9 +7,9 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
-      # ==================== 内核版本配置 ====================
+      # ==================== Kernel version配置 ====================
       kernel_version:
-        description: "内核版本"
+        description: "Kernel version"
         required: true
         type: choice
         options:
@@ -20,7 +20,7 @@ on:
           - "6.12"
         default: "5.10"
       os_patch_level:
-        description: "安全补丁级别 (如 2022-01, lts)"
+        description: "Security patch level (for example, 2022-01 or lts)"
         required: true
         type: string
         default: "2022-01"
@@ -34,27 +34,27 @@ on:
 
       # ==================== 可选配置 ====================
       version:
-        description: "自定义版本名 (可选)"
+        description: "Custom version name (optional)"
         required: false
         type: string
       build_time:
-        description: "自定义构建时间 (可选，N或留空=当前UTC)"
+        description: "Custom build time (optional; N or blank uses current UTC)"
         required: false
         type: string
         default: "Sun Dec 01 08:10:00 UTC 2024"
 
       # ==================== 选项配置 ====================
       use_kpm:
-        description: "KPM 功能（patched 尚不支持）"
+        description: "KPM support (patched is not supported yet)"
         required: true
         type: choice
-        default: "disabled (关闭)"
+        default: "disabled (off)"
         options:
-          - "disabled (关闭)"
-          - "enabled (开启)"
-          - "patched (开启并修补，尚不支持)"
+          - "disabled (off)"
+          - "enabled (on)"
+          - "patched (on; patching not supported yet)"
       droidspaces:
-        description: "Droidspaces 容器支持 (5.10~6.6: 槽位补丁, 6.12: 开/关)"
+        description: "Droidspaces container support (5.10–6.6: slot patch; 6.12: on/off)"
         required: false
         type: choice
         options:
@@ -64,47 +64,47 @@ on:
           - "345"
         default: "off"
       artifact_upload_mode:
-        description: "构建产物上传模式"
+        description: "Artifact upload mode"
         required: true
         type: choice
         options:
-          - "仅上传 AnyKernel3.zip"
-          - "上传全部"
-        default: "仅上传 AnyKernel3.zip"
+          - "AnyKernel3.zip only"
+          - "Upload all"
+        default: "AnyKernel3.zip only"
       droidspaces_ntsync:
-        description: "启用 Droidspaces 容器 NTSync 支持（需启用 Droidspaces）"
+        description: "Enable Droidspaces NTSync support (requires Droidspaces)"
         required: false
         type: boolean
         default: false
 
       # ==================== 功能开关 ====================
       use_zram:
-        description: "启用 ZRAM 增强算法"
+        description: "Enable ZRAM enhancements"
         required: true
         type: boolean
         default: false
       use_bbg:
-        description: "启用 BBG 防格机"
+        description: "Enable BBG anti-freeze"
         required: true
         type: boolean
         default: false
       use_rekernel:
-        description: "启用 Re-Kernel 驱动"
+        description: "Enable Re-Kernel driver"
         required: false
         type: boolean
         default: false
       cve_2026_43499_patch:
-        description: "应用 CVE-2026-43499 rtmutex 修复链"
+        description: "Apply CVE-2026-43499 rtmutex fix chain"
         required: false
         type: boolean
         default: false
       cancel_susfs:
-        description: "禁用 SUSFS"
+        description: "Disable SUSFS"
         required: true
         type: boolean
         default: false
       supp_op:
-        description: "启用一加 8E 支持"
+        description: "Enable OnePlus 8E support"
         required: false
         type: boolean
         default: false
@@ -143,7 +143,7 @@ jobs:
           }
           android_version = android_map.get(kernel_version)
           if android_version is None:
-              print(f"::error::未适配的内核版本: {kernel_version}")
+              print(f"::error::未适配的Kernel version: {kernel_version}")
               sys.exit(1)
 
           data_path = Path("data") / android_version / f"{kernel_version}.json"

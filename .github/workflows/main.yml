@@ -24,7 +24,7 @@ on:
     inputs:
       # ==================== 发布配置 ====================
       release_type:
-        description: "发布类型"
+        description: "Release type"
         type: choice
         options:
           - Actions
@@ -41,26 +41,26 @@ on:
 
       # ==================== 可选配置 ====================
       version:
-        description: "自定义版本名 (可选)"
+        description: "Custom version name (optional)"
         type: string
         default: ""
         required: false
       build_time:
-        description: "自定义构建时间 (可选，N或留空=当前UTC)"
+        description: "Custom build time (optional; N or blank uses current UTC)"
         type: string
         default: "Sun Dec 01 08:10:00 UTC 2024"
         required: false
       # ==================== 选项配置 ====================
       use_kpm:
-        description: "KPM 功能（patched 尚不支持）"
+        description: "KPM support (patched is not supported yet)"
         type: choice
-        default: "disabled (关闭)"
+        default: "disabled (off)"
         options:
-          - "disabled (关闭)"
-          - "enabled (开启)"
-          - "patched (开启并修补，尚不支持)"
+          - "disabled (off)"
+          - "enabled (on)"
+          - "patched (on; patching not supported yet)"
       droidspaces:
-        description: "Droidspaces 容器支持 (5.10~6.6: 槽位补丁, 6.12: 开/关)"
+        description: "Droidspaces container support (5.10–6.6: slot patch; 6.12: on/off)"
         type: choice
         options:
           - "off"
@@ -69,29 +69,29 @@ on:
           - "345"
         default: "off"
       droidspaces_ntsync:
-        description: "启用 Droidspaces 容器 NTSync 支持（需启用 Droidspaces）"
+        description: "Enable Droidspaces NTSync support (requires Droidspaces)"
         type: boolean
         default: false
 
       # ==================== 功能开关 ====================
       use_zram:
-        description: "启用 ZRAM 增强算法"
+        description: "Enable ZRAM enhancements"
         type: boolean
         default: false
       use_bbg:
-        description: "启用 BBG 防格机"
+        description: "Enable BBG anti-freeze"
         type: boolean
         default: false
       use_rekernel:
-        description: "启用 Re-Kernel 驱动"
+        description: "Enable Re-Kernel driver"
         type: boolean
         default: false
       cve_2026_43499_patch:
-        description: "应用 CVE-2026-43499 rtmutex 修复链"
+        description: "Apply CVE-2026-43499 rtmutex fix chain"
         type: boolean
         default: false
       cancel_susfs:
-        description: "禁用 SUSFS"
+        description: "Disable SUSFS"
         type: boolean
         default: false
 
@@ -117,7 +117,7 @@ on:
         type: boolean
         default: false
       build_all:
-        description: "构建全部版本"
+        description: "Build all versions"
         type: boolean
         default: true
 
@@ -146,7 +146,7 @@ jobs:
       cve_2026_43499_patch: ${{ inputs.cve_2026_43499_patch }}
       cancel_susfs: ${{ inputs.cancel_susfs }}
       droidspaces: ${{ inputs.droidspaces }}
-      artifact_upload_mode: "上传全部"
+      artifact_upload_mode: "Upload all"
       droidspaces_ntsync: ${{ inputs.droidspaces_ntsync }}
       called_from_main: true
 
@@ -166,7 +166,7 @@ jobs:
       cve_2026_43499_patch: ${{ inputs.cve_2026_43499_patch }}
       cancel_susfs: ${{ inputs.cancel_susfs }}
       droidspaces: ${{ inputs.droidspaces }}
-      artifact_upload_mode: "上传全部"
+      artifact_upload_mode: "Upload all"
       droidspaces_ntsync: ${{ inputs.droidspaces_ntsync }}
       called_from_main: true
 
@@ -186,7 +186,7 @@ jobs:
       cve_2026_43499_patch: ${{ inputs.cve_2026_43499_patch }}
       cancel_susfs: ${{ inputs.cancel_susfs }}
       droidspaces: ${{ inputs.droidspaces }}
-      artifact_upload_mode: "上传全部"
+      artifact_upload_mode: "Upload all"
       droidspaces_ntsync: ${{ inputs.droidspaces_ntsync }}
       called_from_main: true
 
@@ -206,7 +206,7 @@ jobs:
       cve_2026_43499_patch: ${{ inputs.cve_2026_43499_patch }}
       cancel_susfs: ${{ inputs.cancel_susfs }}
       droidspaces: ${{ inputs.droidspaces }}
-      artifact_upload_mode: "上传全部"
+      artifact_upload_mode: "Upload all"
       droidspaces_ntsync: ${{ inputs.droidspaces_ntsync }}
       called_from_main: true
 
@@ -226,7 +226,7 @@ jobs:
       cve_2026_43499_patch: ${{ inputs.cve_2026_43499_patch }}
       cancel_susfs: ${{ inputs.cancel_susfs }}
       droidspaces: ${{ inputs.droidspaces }}
-      artifact_upload_mode: "上传全部"
+      artifact_upload_mode: "Upload all"
       droidspaces_ntsync: ${{ inputs.droidspaces_ntsync }}
       called_from_main: true
 
@@ -438,7 +438,7 @@ jobs:
 
           | 项目 | 内容 |
           |:---|:---|
-          | 发布类型 | ${{ inputs.release_type }} |
+          | Release type | ${{ inputs.release_type }} |
           | 发布时间 | $BUILD_DATE |
           | 构建范围 | $build_targets |
 
@@ -482,7 +482,7 @@ jobs:
 
           1. 恢复原厂 Boot 镜像
           2. 使用 KernelSU 管理器或 recovery 提取日志
-          3. 提交到 [Issues](https://github.com/zzh20188/GKI_KernelSU_SUSFS/issues)，并附上设备型号、Android 版本、内核版本和刷入文件名
+          3. 提交到 [Issues](https://github.com/zzh20188/GKI_KernelSU_SUSFS/issues)，并附上设备型号、Android 版本、Kernel version和刷入文件名
 
           </details>
 

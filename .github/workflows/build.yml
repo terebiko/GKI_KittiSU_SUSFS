@@ -52,7 +52,7 @@ on:
       use_kpm:
         required: true
         type: string
-        default: "disabled (关闭)"
+        default: "disabled (off)"
       use_rekernel:
         required: false
         type: boolean
@@ -76,7 +76,7 @@ on:
       artifact_upload_mode:
         required: false
         type: string
-        default: "上传全部"
+        default: "Upload all"
       droidspaces_ntsync:
         required: false
         type: boolean
@@ -100,7 +100,7 @@ jobs:
           echo "       内核构建配置摘要"
           echo "========================================"
           echo "Android 版本  : ${{ inputs.android_version }}"
-          echo "内核版本      : ${{ inputs.kernel_version }}"
+          echo "Kernel version      : ${{ inputs.kernel_version }}"
           echo "子版本号      : ${{ inputs.sub_level }}"
           echo "补丁级别      : ${{ inputs.os_patch_level }}"
           echo "KittiSU branch: ${{ inputs.kittisu_branch }}"
@@ -738,7 +738,7 @@ jobs:
               PATCH_FILE="$DROIDSPACES_PATCHES/below-kernel-6.12/001.GKI-below-6.12-fix_sysvipc_kabi_${SLOT_NAME}.patch"
               ;;
             *)
-              echo "::warning::Droidspaces: 未适配的内核版本 $KERNEL_VER，跳过补丁"
+              echo "::warning::Droidspaces: 未适配的Kernel version $KERNEL_VER，跳过补丁"
               exit 0
               ;;
           esac
@@ -815,7 +815,7 @@ jobs:
           enable_config_if_defined CONFIG_IP_SET_HASH_NET
           enable_config_if_defined CONFIG_NETFILTER_XT_SET
 
-          # REJECT 目标在不同内核版本上的符号名可能不同，按实际存在的配置启用
+          # REJECT 目标在不同Kernel version上的符号名可能不同，按实际存在的配置启用
           enable_config_if_defined CONFIG_NETFILTER_XT_TARGET_REJECT
           enable_config_if_defined CONFIG_IP_NF_TARGET_REJECT
 
@@ -1254,7 +1254,7 @@ jobs:
           gzip -n -k -f -9 ./Image > ./Image.gz
 
       - name: Create AnyKernel3 archive
-        if: inputs.artifact_upload_mode == '上传全部'
+        if: inputs.artifact_upload_mode == 'Upload all'
         run: |
           cd "$ANYKERNEL3"
           ZIP_NAME="${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AnyKernel3.zip"
@@ -1262,7 +1262,7 @@ jobs:
           zip -r "../$ZIP_NAME" ./*
 
       - name: Prepare AnyKernel3 directory
-        if: inputs.artifact_upload_mode != '上传全部'
+        if: inputs.artifact_upload_mode != 'Upload all'
         run: |
           mv ./Image "$ANYKERNEL3/Image"
 
@@ -1342,7 +1342,7 @@ jobs:
           fi
 
       - name: Upload AnyKernel3 flash package
-        if: inputs.artifact_upload_mode != '上传全部'
+        if: inputs.artifact_upload_mode != 'Upload all'
         uses: actions/upload-artifact@v6
         with:
           name: KittiSU_kernel-${{ env.CONFIG }}-AnyKernel3
@@ -1350,7 +1350,7 @@ jobs:
           compression-level: 9
 
       - name: Upload all build artifacts
-        if: inputs.artifact_upload_mode == '上传全部'
+        if: inputs.artifact_upload_mode == 'Upload all'
         uses: actions/upload-artifact@v6
         with:
           name: KittiSU_kernel-${{ env.CONFIG }}
