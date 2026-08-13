@@ -1,4 +1,4 @@
-name: 内核构建 - Android 13 (5.15)
+name: Kernel Build - Android 13 (5.15)
 
 permissions:
   contents: write

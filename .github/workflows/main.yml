@@ -8,7 +8,7 @@
 # 4. 创建 GitHub Release (可选)
 # ========================================
 
-name: 构建内核
+name: Build Kernel
 
 # 并发控制：同一分支只运行一个实例，新运行会取消旧的
 concurrency:

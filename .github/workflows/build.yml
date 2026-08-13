@@ -1,4 +1,4 @@
-name: 内核构建流程
+name: Kernel Build Pipeline
 
 permissions:
   contents: write
