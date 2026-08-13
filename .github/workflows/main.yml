@@ -242,13 +242,13 @@ jobs:
       - build-a15-6-6
       - build-a16-6-12
     steps:
-      - name: 下载冲突文件
+      - name: Download reject files
         uses: actions/download-artifact@v8
         with:
           path: ./downloaded-artifacts
           pattern: '*-Rejects'
 
-      - name: 处理冲突文件
+      - name: Process reject files
         run: |
           mkdir -p aio-rejects
           for dir in ./downloaded-artifacts/*-Rejects; do
@@ -262,7 +262,7 @@ jobs:
             cd aio-rejects && zip -r -q -9 ../AIO-REJ.zip . && cd ..
           fi
 
-      - name: 上传汇总冲突文件
+      - name: Upload combined reject files
         uses: actions/upload-artifact@v6
         with:
           name: AIO-REJ
@@ -295,7 +295,7 @@ jobs:
     steps:
       # ==================== 设置显示名称 ====================
       # 预计算各种显示名称，简化后续引用
-      - name: 设置显示名称
+      - name: Set display name
         run: |
           echo "KSU_NAME=KittiSU" >> $GITHUB_ENV
 
@@ -324,7 +324,7 @@ jobs:
 
       # ==================== 验证构建状态 ====================
       # 确保所有选中的构建任务都成功完成
-      - name: 验证构建状态
+      - name: Validate build status
         run: |
           failed=0
           check_build() {
@@ -342,7 +342,7 @@ jobs:
           [[ "$failed" -ne 0 ]] && exit 1 || true
 
       # ==================== 检出代码 ====================
-      - name: 检出代码
+      - name: Checkout code
         uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
@@ -363,7 +363,7 @@ jobs:
 
       # ==================== 获取 SUSFS 提交信息 ====================
       # 获取各版本 SUSFS 的 Git 提交信息
-      - name: 获取 SUSFS 提交信息
+      - name: Get SUSFS commit information
         run: |
           GITLAB_OWNER="simonpunk"
           GITLAB_REPO="susfs4ksu"
@@ -386,7 +386,7 @@ jobs:
 
       # ==================== 生成发布说明 ====================
       # 创建包含详细信息的发布说明文档
-      - name: 生成发布说明
+      - name: Generate release notes
         run: |
           BUILD_DATE=$(date -u '+%Y-%m-%d %H:%M UTC')
           if [[ "$KSU_REF" =~ ^[0-9a-f]{40}$ ]]; then
@@ -508,7 +508,7 @@ jobs:
 
       # ==================== 生成版本标签 ====================
       # 根据 SUSFS 版本生成递增的发布标签
-      - name: 生成版本标签
+      - name: Generate version tag
         run: |
           # 获取 SUSFS 版本，如果 get-manager 被跳过则使用默认值
           SUS_VERSION="${{ needs.get-manager.outputs.susVer }}"
@@ -530,13 +530,13 @@ jobs:
           echo "生成标签: $NEW_TAG"
 
       # ==================== 下载构建产物 ====================
-      - name: 下载构建产物
+      - name: Download build artifacts
         uses: actions/download-artifact@v8
         with:
           path: ./downloaded-artifacts
 
       # ==================== 创建 GitHub Release ====================
-      - name: 创建 GitHub Release
+      - name: Create GitHub Release
         run: |
           PRERELEASE_FLAG=""
           if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
@@ -550,7 +550,7 @@ jobs:
             $PRERELEASE_FLAG
 
       # ==================== 上传管理器和模块 ====================
-      - name: 上传管理器和 SUSFS 模块
+      - name: Upload manager and SUSFS module
         continue-on-error: true
         run: |
           echo "准备上传 APK 与 SUSFS 模块..."
@@ -568,7 +568,7 @@ jobs:
           done
 
       # ==================== 上传内核产物 ====================
-      - name: 上传内核产物
+      - name: Upload kernel artifacts
         run: |
           for file in ./downloaded-artifacts/*_kernel-*/*; do
             [ -d "$file" ] && continue
@@ -579,7 +579,7 @@ jobs:
           done
 
       # ==================== 构建摘要 ====================
-      - name: 构建摘要
+      - name: Build summary
         run: |
           echo "## 发布已创建" >> $GITHUB_STEP_SUMMARY
           echo "- **标签**: $NEW_TAG" >> $GITHUB_STEP_SUMMARY

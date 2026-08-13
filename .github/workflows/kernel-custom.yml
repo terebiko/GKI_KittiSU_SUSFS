@@ -117,10 +117,10 @@ jobs:
       sub_level: ${{ steps.resolve.outputs.sub_level }}
       kernel_full: ${{ steps.resolve.outputs.kernel_full }}
     steps:
-      - name: 检出版本数据
+      - name: Checkout version data
         uses: actions/checkout@v7
 
-      - name: 解析安全补丁级别
+      - name: Resolve security patch level
         id: resolve
         env:
           KERNEL_VERSION: ${{ inputs.kernel_version }}

@@ -28,7 +28,7 @@ jobs:
 
     steps:
       # ==================== 验证发布是否存在 ====================
-      - name: 验证 Release 存在
+      - name: Validate release exists
         run: |
           if ! gh release view "${{ inputs.target_tag }}" --repo ${{ github.repository }} > /dev/null 2>&1; then
             echo "::error::Release '${{ inputs.target_tag }}' 不存在"
@@ -39,7 +39,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ==================== 获取原始发布信息 ====================
-      - name: 获取原始发布信息
+      - name: Get original release information
         id: info
         run: |
           gh release view "${{ inputs.target_tag }}" --repo ${{ github.repository }} \
@@ -57,7 +57,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ==================== 处理 Normal 类型 ====================
-      - name: 处理 Normal 类型 - 标记正常
+      - name: Handle normal release
         if: inputs.issue_type == 'Normal'
         run: |
           cat > new_body.md << 'EOF'
@@ -87,7 +87,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ==================== 处理 Bug 类型 ====================
-      - name: 处理 Bug 类型
+      - name: Handle bug release
         if: inputs.issue_type == 'Bug'
         run: |
           cat > new_body.md << 'EOF'
@@ -117,7 +117,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ==================== 处理 Critical 类型 ====================
-      - name: 处理 Critical 类型 - 删除并重建
+      - name: Handle critical release
         if: inputs.issue_type == 'Critical'
         run: |
           ORIGINAL_TITLE=$(cat original_title.txt)
@@ -168,7 +168,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ==================== 完成通知 ====================
-      - name: 完成
+      - name: Complete
         run: |
           echo "=========================================="
           echo "🎯 目标标签: ${{ inputs.target_tag }}"

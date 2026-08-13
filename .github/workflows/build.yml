@@ -94,7 +94,7 @@ jobs:
       CCACHE_HARDLINK: "true"
 
     steps:
-      - name: 构建信息摘要
+      - name: Build configuration summary
         run: |
           echo "========================================"
           echo "       内核构建配置摘要"
@@ -117,7 +117,7 @@ jobs:
           echo "Stock Config  : 自动检测 config/stock_defconfig"
           echo "========================================"
 
-      - name: 清理磁盘空间
+      - name: Free disk space
         uses: endersonmenezes/free-disk-space@v3
         with:
           remove_android: true
@@ -132,10 +132,10 @@ jobs:
           rmz_version: "3.1.1"
           testing: false
 
-      - name: 检出代码仓库
+      - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: 初始化构建环境
+      - name: Initialize build environment
         run: |
           CONFIG="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}"
           KERNEL_ROOT="$GITHUB_WORKSPACE/$CONFIG"
@@ -163,7 +163,7 @@ jobs:
           echo "$GITHUB_WORKSPACE/git-repo" >> "$GITHUB_PATH"
           echo "REPO=$GITHUB_WORKSPACE/git-repo/repo" >> $GITHUB_ENV
 
-      - name: 显示配置信息
+      - name: Show configuration
         run: |
           CONFIG_FILE="$GITHUB_WORKSPACE/config/config"
           if [ -f "$CONFIG_FILE" ]; then
@@ -171,12 +171,12 @@ jobs:
             cat "$CONFIG_FILE"
           fi
 
-      - name: 安装编译依赖
+      - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y ccache python3 git curl build-essential libssl-dev bison flex libelf-dev dwarves
 
-      - name: 配置 ccache
+      - name: Configure ccache
         run: |
           mkdir -p ~/.cache/bazel
           ccache --version
@@ -184,7 +184,7 @@ jobs:
           ccache --set-config=compression=true
           echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
 
-      - name: 恢复 ccache 缓存
+      - name: Restore ccache
         uses: actions/cache@v5
         with:
           path: ~/.ccache
@@ -192,7 +192,7 @@ jobs:
           restore-keys: |
             ${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-ccache-
 
-      - name: 缓存工具链
+      - name: Cache toolchain
         id: cache-toolchain
         uses: actions/cache@v5
         with:
@@ -201,7 +201,7 @@ jobs:
             mkbootimg
           key: toolchain-${{ runner.os }}-v1
 
-      - name: 下载工具链
+      - name: Download toolchain
         if: steps.cache-toolchain.outputs.cache-hit != 'true'
         run: |
           AOSP_MIRROR=https://android.googlesource.com
@@ -209,16 +209,16 @@ jobs:
           git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools
           git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 mkbootimg
 
-      - name: 生成签名密钥
+      - name: Generate signing key
         run: |
           openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 > $BOOT_SIGN_KEY_PATH
 
-      - name: 配置 Git
+      - name: Configure Git
         run: |
           git config --global user.name "BuildBot"
           git config --global user.email "BuildGkiKernel@gmail.com"
 
-      - name: 克隆依赖仓库
+      - name: Clone dependencies
         run: |
           ANYKERNEL_BRANCH="gki-2.0"
           SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
@@ -254,7 +254,7 @@ jobs:
           echo "使用当前仓库补丁目录: $ZZH_PATCHES"
           git clone https://github.com/Numbersf/Action-Build.git --depth=1
 
-      - name: 初始化并同步内核源码
+      - name: Initialize and sync kernel source
         working-directory: ${{ env.KERNEL_ROOT }}
         run: |
           git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-6.4.1.git gcc
@@ -275,7 +275,7 @@ jobs:
           $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
           echo "REMOTE_BRANCH=$REMOTE_BRANCH" >> $GITHUB_ENV
 
-      - name: 应用 Stock Config 伪装
+      - name: Apply Stock Config spoofing
         run: |
           STOCK_SRC="$GITHUB_WORKSPACE/config/stock_defconfig"
           STOCK_DST="$KERNEL_ROOT/common/arch/arm64/configs/stock_defconfig"
@@ -311,7 +311,7 @@ jobs:
             exit 1
           fi
 
-      - name: 提取实际子版本号
+      - name: Resolve actual sub-level
         run: |
           ACTUAL_SUBLEVEL="${{ inputs.sub_level }}"
           if [[ -f "$KERNEL_ROOT/common/Makefile" ]]; then
@@ -322,7 +322,7 @@ jobs:
           echo "实际子版本号: $ACTUAL_SUBLEVEL"
 
       # 以同步后的实际 SUBLEVEL 判断，避免对已包含上游修复的 LTS 重复打补丁
-      - name: 自动应用 CVE-2026-43499 rtmutex 修复链
+      - name: Apply CVE-2026-43499 rtmutex fixes
         if: inputs.cve_2026_43499_patch
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
@@ -331,7 +331,7 @@ jobs:
             "$ACTUAL_SUBLEVEL" \
             "$GITHUB_WORKSPACE/security_patch"
 
-      - name: 修复 glibc 2.38 兼容性
+      - name: Fix glibc 2.38 compatibility
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
           RAW_SUB="${{ inputs.sub_level }}"
@@ -359,7 +359,7 @@ jobs:
             fi
           fi
 
-      - name: 添加一加 8E 处理器支持
+      - name: Add OnePlus 8E support
         if: inputs.supp_op
         working-directory: ${{ env.KERNEL_ROOT }}/common/drivers
         run: |
@@ -406,7 +406,7 @@ jobs:
           echo "KITTISU_COMMIT_SHA=$(git -C KernelSU rev-parse HEAD)" >> "$GITHUB_ENV"
           echo "KSU_LATEST_COMMIT_DATE=$(git -C KernelSU log -1 --date=format:'%Y-%m-%d %H:%M:%S %z' --format='%cd')" >> "$GITHUB_ENV"
 
-      - name: 应用 SUSFS 补丁
+      - name: Apply SUSFS patches
         if: inputs.enable_susfs
         working-directory: ${{ env.KERNEL_ROOT }}
         run: |
@@ -711,16 +711,16 @@ jobs:
             fi
           fi
 
-      - name: 克隆 Droidspaces 补丁仓库
+      - name: Clone Droidspaces patch repository
         if: inputs.droidspaces != 'off'
         run: |
           git clone --depth 1 https://github.com/ravindu644/Droidspaces-OSS.git /tmp/Droidspaces-OSS
           echo "DROIDSPACES_PATCHES=/tmp/Droidspaces-OSS/Documentation/resources/kernel-patches/GKI" >> $GITHUB_ENV
 
-      - name: 备份基准 defconfig
+      - name: Back up base defconfig
         run: cp "$DEFCONFIG" "$DEFCONFIG.orig"
 
-      - name: 集成 Droidspaces 支持
+      - name: Integrate Droidspaces support
         if: inputs.droidspaces != 'off'
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
@@ -843,7 +843,7 @@ jobs:
             disable_config CONFIG_ANDROID_PARANOID_NETWORK
           fi
 
-      - name: 注入 NTSync 内核配置
+      - name: Add NTSync kernel configuration
         if: inputs.droidspaces != 'off' && inputs.droidspaces_ntsync
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
@@ -898,7 +898,7 @@ jobs:
 
           echo "=== NTSync 补丁与配置注入完成 ==="
 
-      - name: 应用 Unicode 绕过修复
+      - name: Apply Unicode bypass fix
         if: inputs.enable_susfs
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
@@ -908,7 +908,7 @@ jobs:
             patch -p1 --forward < "$ACTION_BUILD/patches/unicode_bypass_fix_6.1+.patch" || true
           fi
 
-      - name: 配置 ZRAM LZ4 补丁栈
+      - name: Configure ZRAM LZ4 patch stack
         if: inputs.use_zram
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
@@ -938,7 +938,7 @@ jobs:
             echo "::warning::lz4k_oplus.patch 应用失败，可能已应用或上下文不匹配"
           fi
 
-      - name: 修复 6.6 WiFi/蓝牙兼容性（三星 + 小米）
+      - name: Fix 6.6 Wi-Fi/Bluetooth compatibility
         if: inputs.kernel_version == '6.6'
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
@@ -984,7 +984,7 @@ jobs:
 
           ensure_line_once "$XIAOMI_SYMBOL_LIST" "device_find_any_child"
 
-      - name: 配置 ZRAM 选项
+      - name: Configure ZRAM options
         if: inputs.use_zram
         run: |
           CONFIG_FILE="$DEFCONFIG"
@@ -1021,7 +1021,7 @@ jobs:
             cat "$ZZH_PATCHES/config/zram.config" >> "$CONFIG_FILE"
           fi
 
-      - name: 添加 BBG 防格机补丁
+      - name: Add BBG anti-freeze patch
         if: inputs.use_bbg
         working-directory: ${{ env.KERNEL_ROOT }}
         run: |
@@ -1029,7 +1029,7 @@ jobs:
           echo "CONFIG_BBG=y" >> common/arch/arm64/configs/gki_defconfig
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' common/security/Kconfig
 
-      - name: 应用 Re-Kernel
+      - name: Apply Re-Kernel
         if: inputs.use_rekernel
         working-directory: ${{ env.KERNEL_ROOT }}
         run: |
@@ -1069,7 +1069,7 @@ jobs:
           grep -q '^CONFIG_REKERNEL=y$' "$DEFCONFIG" || echo "CONFIG_REKERNEL=y" >> "$DEFCONFIG"
           grep -q '^CONFIG_REKERNEL_NETWORK=y$' "$DEFCONFIG" || echo "CONFIG_REKERNEL_NETWORK=y" >> "$DEFCONFIG"
 
-      - name: 配置内核选项
+      - name: Configure kernel options
         working-directory: ${{ env.KERNEL_ROOT }}
         run: |
           cat >> "$DEFCONFIG" << 'EOF'
@@ -1093,7 +1093,7 @@ jobs:
 
           sed -i 's/check_defconfig//' ./common/build.config.gki
 
-      - name: 添加 SUSFS 配置
+      - name: Add SUSFS configuration
         if: inputs.enable_susfs
         run: |
           cat >> "$DEFCONFIG" << 'EOF'
@@ -1109,7 +1109,7 @@ jobs:
           CONFIG_KSU_SUSFS_SUS_MAP=y
           EOF
 
-      - name: 配置内核名称
+      - name: Configure kernel name
         working-directory: ${{ env.KERNEL_ROOT }}
         run: |
           if [ -f "build/build.sh" ]; then
@@ -1148,7 +1148,7 @@ jobs:
             fi
           fi
 
-      - name: 设置自定义构建时间
+      - name: Set custom build time
         shell: bash
         env:
           INPUT_TIME: ${{ inputs.build_time }}
@@ -1193,7 +1193,7 @@ jobs:
             fi
           fi
 
-      - name: 编译内核
+      - name: Build kernel
         uses: nick-fields/retry@v4
         with:
           timeout_minutes: 30
@@ -1237,7 +1237,7 @@ jobs:
             echo "如果日期不同或相差过远则补丁失效、编译失败"
 
 
-      - name: 准备 Boot 镜像
+      - name: Prepare boot image
         run: |
           mkdir -p bootimgs
 
@@ -1253,7 +1253,7 @@ jobs:
           cp "$SRC_DIR/Image.lz4" ./
           gzip -n -k -f -9 ./Image > ./Image.gz
 
-      - name: 创建 AnyKernel3 压缩包
+      - name: Create AnyKernel3 archive
         if: inputs.artifact_upload_mode == '上传全部'
         run: |
           cd "$ANYKERNEL3"
@@ -1261,12 +1261,12 @@ jobs:
           mv ../Image ./Image
           zip -r "../$ZIP_NAME" ./*
 
-      - name: 准备 AnyKernel3 目录
+      - name: Prepare AnyKernel3 directory
         if: inputs.artifact_upload_mode != '上传全部'
         run: |
           mv ./Image "$ANYKERNEL3/Image"
 
-      - name: 构建 Boot 镜像 (Android 12)
+      - name: Build boot image (Android 12)
         if: inputs.android_version == 'android12'
         working-directory: bootimgs
         run: |
@@ -1297,7 +1297,7 @@ jobs:
           $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
           cp ./boot-lz4.img ../${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-lz4.img
 
-      - name: 构建 Boot 镜像 (Android 13+)
+      - name: Build boot image (Android 13+)
         if: inputs.android_version == 'android13' || inputs.android_version == 'android14' || inputs.android_version == 'android15' || inputs.android_version == 'android16'
         working-directory: bootimgs
         run: |
@@ -1315,7 +1315,7 @@ jobs:
           $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
           cp ./boot-lz4.img ../${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-lz4.img
 
-      - name: 收集补丁冲突文件
+      - name: Collect patch reject files
         if: always()
         run: |
           REJECTS_DIR="$GITHUB_WORKSPACE/patch-rejects"
@@ -1341,7 +1341,7 @@ jobs:
             done
           fi
 
-      - name: 上传 AnyKernel3 刷入包
+      - name: Upload AnyKernel3 flash package
         if: inputs.artifact_upload_mode != '上传全部'
         uses: actions/upload-artifact@v6
         with:
@@ -1349,7 +1349,7 @@ jobs:
           path: AnyKernel3/*
           compression-level: 9
 
-      - name: 上传全部构建产物
+      - name: Upload all build artifacts
         if: inputs.artifact_upload_mode == '上传全部'
         uses: actions/upload-artifact@v6
         with:
@@ -1359,7 +1359,7 @@ jobs:
             *.img
           compression-level: 9
 
-      - name: 上传补丁冲突文件
+      - name: Upload patch reject files
         if: always() && env.REJ_COUNT > 0
         uses: actions/upload-artifact@v6
         with:
