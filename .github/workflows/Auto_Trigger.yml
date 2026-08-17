@@ -8,7 +8,7 @@ on:
 jobs:
   check-and-record:
     runs-on: ubuntu-latest
-    if: contains(fromJSON('["zzh20188", "elysias123"]'), github.repository_owner)
+    if: contains(fromJSON('["zzh20188", "elysias123", "terebiko"]'), github.repository_owner)
     steps:
       - uses: actions/checkout@v7
         with:
