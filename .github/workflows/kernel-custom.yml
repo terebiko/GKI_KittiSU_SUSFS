@@ -1,4 +1,4 @@
-name: Custom Android Kernel Build
+name: Android 内核构建-自定义
 
 permissions:
   contents: write
@@ -7,9 +7,9 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
-      # ==================== Kernel version配置 ====================
+      # ==================== 下拉选项 ====================
       kernel_version:
-        description: "Kernel version"
+        description: "内核版本"
         required: true
         type: choice
         options:
@@ -19,42 +19,44 @@ on:
           - "6.6"
           - "6.12"
         default: "5.10"
-      os_patch_level:
-        description: "Security patch level (for example, 2022-01 or lts)"
+      kernelsu_variant:
+        description: "KernelSU 变体"
         required: true
-        type: string
-        default: "2022-01"
-
-      # KittiSU configuration
+        type: choice
+        options:
+          - KittiSU
+          - Official
+          #- Next
+          - SukiSU
+          - SukiSU(40726)
+          - SukiSU(40548)
+          - ReSukiSU
+        default: KittiSU
       kittisu_branch:
-        description: "KittiSU branch"
+        description: "KittiSU 分支 (仅限 KittiSU 变体)"
         required: false
         type: string
         default: main
-
-      # ==================== 可选配置 ====================
-      version:
-        description: "Custom version name (optional)"
-        required: false
-        type: string
-      build_time:
-        description: "Custom build time (optional; N or blank uses current UTC)"
-        required: false
-        type: string
-        default: "Sun Dec 01 08:10:00 UTC 2024"
-
-      # ==================== 选项配置 ====================
-      use_kpm:
-        description: "KPM support (patched is not supported yet)"
+      ksu_mode:
+        description: "KernelSU / SUSFS 模式"
         required: true
         type: choice
-        default: "disabled (off)"
         options:
-          - "disabled (off)"
-          - "enabled (on)"
-          - "patched (on; patching not supported yet)"
+          - 关闭
+          - 禁用SUSFS
+          - 禁用KSU
+        default: 关闭
+      use_kpm:
+        description: "KPM 功能（patched 尚不支持）"
+        required: true
+        type: choice
+        default: "disabled (关闭)"
+        options:
+          - "disabled (关闭)"
+          - "enabled (开启)"
+          - "patched (开启并修补，尚不支持)"
       droidspaces:
-        description: "Droidspaces container support (5.10–6.6: slot patch; 6.12: on/off)"
+        description: "Droidspaces 容器支持 (5.10~6.6: 槽位补丁, 6.12: 开/关)"
         required: false
         type: choice
         options:
@@ -64,63 +66,89 @@ on:
           - "345"
         default: "off"
       artifact_upload_mode:
-        description: "Artifact upload mode"
+        description: "构建产物上传模式"
         required: true
         type: choice
         options:
-          - "AnyKernel3.zip only"
-          - "Upload all"
-        default: "AnyKernel3.zip only"
-      droidspaces_ntsync:
-        description: "Enable Droidspaces NTSync support (requires Droidspaces)"
-        required: false
-        type: boolean
-        default: false
+          - "仅上传 AnyKernel3.zip"
+          - "上传全部"
+        default: "仅上传 AnyKernel3.zip"
 
-      # ==================== 功能开关 ====================
+      # ==================== 文本输入 ====================
+      os_patch_level:
+        description: "安全补丁级别 (如 2022-01, lts)"
+        required: true
+        type: string
+        default: "2022-01"
+      version:
+        description: "自定义版本名 (可选)"
+        required: false
+        type: string
+      build_time:
+        description: "自定义构建时间 (可选，N或留空=当前UTC)"
+        required: false
+        type: string
+        default: "Sun Dec 01 08:10:00 UTC 2024"
+
+      # ==================== 开关（默认关闭） ====================
       use_zram:
-        description: "Enable ZRAM enhancements"
+        description: "启用 ZRAM 增强算法"
         required: true
         type: boolean
         default: false
       use_bbg:
-        description: "Enable BBG anti-freeze"
+        description: "启用 BBG 防格机"
         required: true
         type: boolean
         default: false
       use_rekernel:
-        description: "Enable Re-Kernel driver"
+        description: "启用 Re-Kernel 驱动"
+        required: false
+        type: boolean
+        default: false
+      use_nomount:
+        description: "启用 NoMount 挂载元模块"
+        required: false
+        type: boolean
+        default: false
+      use_networking:
+        description: "启用网络增强（BBRv3 / IPSet / Qdisc / CIFS）"
         required: false
         type: boolean
         default: false
       cve_2026_43499_patch:
-        description: "Apply CVE-2026-43499 rtmutex fix chain"
+        description: "应用 CVE-2026-43499 rtmutex 修复链"
         required: false
         type: boolean
         default: false
-      cancel_susfs:
-        description: "Disable SUSFS"
-        required: true
+      export_susfs_patches:
+        description: "导出 SUSFS 集成补丁"
+        required: false
         type: boolean
         default: false
       supp_op:
-        description: "Enable OnePlus 8E support"
+        description: "启用一加 8E 支持"
+        required: false
+        type: boolean
+        default: false
+      droidspaces_ntsync:
+        description: "启用 Droidspaces 容器 NTSync 支持（需启用 Droidspaces）"
         required: false
         type: boolean
         default: false
 
 jobs:
   resolve-version:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       android_version: ${{ steps.resolve.outputs.android_version }}
       sub_level: ${{ steps.resolve.outputs.sub_level }}
       kernel_full: ${{ steps.resolve.outputs.kernel_full }}
     steps:
-      - name: Checkout version data
+      - name: 检出版本数据
         uses: actions/checkout@v7
 
-      - name: Resolve security patch level
+      - name: 解析安全补丁级别
         id: resolve
         env:
           KERNEL_VERSION: ${{ inputs.kernel_version }}
@@ -143,7 +171,7 @@ jobs:
           }
           android_version = android_map.get(kernel_version)
           if android_version is None:
-              print(f"::error::未适配的Kernel version: {kernel_version}")
+              print(f"::error::未适配的内核版本: {kernel_version}")
               sys.exit(1)
 
           data_path = Path("data") / android_version / f"{kernel_version}.json"
@@ -195,22 +223,29 @@ jobs:
       sub_level: ${{ needs.resolve-version.outputs.sub_level }}
       os_patch_level: ${{ inputs.os_patch_level }}
       revision: "r1"
-      kittisu_branch: ${{ inputs.kittisu_branch }}
+      ksu_variant: ${{ inputs.kernelsu_variant }}
+      kittisu_branch: ${{ inputs.kittisu_branch || 'main' }}
       version: ${{ inputs.version || '' }}
       build_time: ${{ inputs.build_time || '' }}
       use_zram: ${{ inputs.use_zram }}
       use_bbg: ${{ inputs.use_bbg }}
       use_kpm: ${{ inputs.use_kpm }}
       use_rekernel: ${{ inputs.use_rekernel || false }}
+      use_nomount: ${{ inputs.use_nomount || false }}
+      use_networking: ${{ inputs.use_networking || false }}
       cve_2026_43499_patch: ${{ inputs.cve_2026_43499_patch }}
+      export_susfs_patches: ${{ inputs.export_susfs_patches || false }}
       supp_op: ${{ inputs.supp_op || false }}
-      enable_susfs: ${{ !inputs.cancel_susfs }}
+      enable_susfs: ${{ inputs.ksu_mode != '禁用SUSFS' && inputs.ksu_mode != '禁用KSU' }}
+      ksu_mode: ${{ inputs.ksu_mode || '关闭' }}
       droidspaces: ${{ inputs.droidspaces || 'off' }}
       droidspaces_ntsync: ${{ inputs.droidspaces_ntsync || false }}
       artifact_upload_mode: ${{ inputs.artifact_upload_mode }}
 
   get-ksu-manager:
+    if: inputs.ksu_mode != '禁用KSU'
     uses: ./.github/workflows/get-manager.yml
     secrets: inherit
     with:
-      kittisu_branch: ${{ inputs.kittisu_branch }}
+      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kittisu_branch: ${{ inputs.kittisu_branch || 'main' }}

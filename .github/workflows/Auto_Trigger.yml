@@ -7,7 +7,7 @@ on:
 
 jobs:
   check-and-record:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: contains(fromJSON('["zzh20188", "elysias123", "terebiko"]'), github.repository_owner)
     steps:
       - uses: actions/checkout@v7
@@ -22,8 +22,13 @@ jobs:
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
       - name: Record default-branch update
         run: |
-          git fetch origin sha:sha || git checkout --orphan sha
-          git checkout sha
+          if git ls-remote --heads origin sha | grep -q sha; then
+            git fetch origin sha:sha
+            git checkout sha
+          else
+            git checkout --orphan sha
+            git rm -rf . || true
+          fi
           echo "${{ steps.current.outputs.sha }}" > latest_sha.txt
           git config user.email action@github.com
           git config user.name 'GitHub Action'

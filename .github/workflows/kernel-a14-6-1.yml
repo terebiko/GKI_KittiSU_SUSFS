@@ -1,4 +1,4 @@
-name: Kernel Build - Android 14 (6.1)
+name: 内核构建 - Android 14 (6.1)
 
 permissions:
   contents: write
@@ -7,31 +7,45 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
+      # ==================== 下拉选项 ====================
+      kernelsu_variant:
+        description: "KernelSU 变体"
+        required: true
+        type: choice
+        options:
+          - KittiSU
+          - Official
+          #- Next
+          - SukiSU
+          - SukiSU(40726)
+          - SukiSU(40548)
+          - ReSukiSU
+        default: KittiSU
       kittisu_branch:
-        description: "KittiSU branch"
+        description: "KittiSU 分支 (仅限 KittiSU 变体)"
         required: false
         type: string
         default: main
-      version:
-        description: "Custom version name (optional)"
-        required: false
-        type: string
-      build_time:
-        description: "Custom build time (optional; N or blank uses current UTC)"
-        required: false
-        type: string
-        default: "Sun Dec 01 08:10:00 UTC 2024"
-      use_kpm:
-        description: "KPM support (patched is not supported yet)"
+      ksu_mode:
+        description: "KernelSU / SUSFS 模式"
         required: true
         type: choice
-        default: "disabled (off)"
         options:
-          - "disabled (off)"
-          - "enabled (on)"
-          - "patched (on; patching not supported yet)"
+          - 关闭
+          - 禁用SUSFS
+          - 禁用KSU
+        default: 关闭
+      use_kpm:
+        description: "KPM 功能（patched 尚不支持）"
+        required: true
+        type: choice
+        default: "disabled (关闭)"
+        options:
+          - "disabled (关闭)"
+          - "enabled (开启)"
+          - "patched (开启并修补，尚不支持)"
       droidspaces:
-        description: "Droidspaces container support"
+        description: "Droidspaces 容器支持"
         required: false
         type: choice
         options:
@@ -41,49 +55,66 @@ on:
           - "345"
         default: "off"
       artifact_upload_mode:
-        description: "Artifact upload mode"
+        description: "构建产物上传模式"
         required: true
         type: choice
         options:
-          - "AnyKernel3.zip only"
-          - "Upload all"
-        default: "AnyKernel3.zip only"
-      droidspaces_ntsync:
-        description: "Enable Droidspaces NTSync support (requires Droidspaces)"
+          - "仅上传 AnyKernel3.zip"
+          - "上传全部"
+        default: "仅上传 AnyKernel3.zip"
+
+      # ==================== 文本输入 ====================
+      version:
+        description: "自定义版本名 (可选)"
         required: false
-        type: boolean
-        default: false
+        type: string
+      build_time:
+        description: "自定义构建时间 (可选，N或留空=当前UTC)"
+        required: false
+        type: string
+        default: "Sun Dec 01 08:10:00 UTC 2024"
+
+      # ==================== 开关（默认关闭） ====================
       use_zram:
-        description: "Enable ZRAM enhancements"
+        description: "启用 ZRAM 增强算法"
         required: true
         type: boolean
         default: false
       use_bbg:
-        description: "Enable BBG anti-freeze"
+        description: "启用 BBG 防格机"
         required: true
         type: boolean
         default: false
       use_rekernel:
-        description: "Enable Re-Kernel driver"
+        description: "启用 Re-Kernel 驱动"
+        required: false
+        type: boolean
+        default: false
+      use_nomount:
+        description: "启用 NoMount 挂载元模块"
+        required: false
+        type: boolean
+        default: false
+      use_networking:
+        description: "启用网络增强（BBRv3 / IPSet / Qdisc / CIFS）"
         required: false
         type: boolean
         default: false
       cve_2026_43499_patch:
-        description: "Apply CVE-2026-43499 rtmutex fix chain"
+        description: "应用 CVE-2026-43499 rtmutex 修复链"
         required: false
         type: boolean
         default: false
-      cancel_susfs:
-        description: "Disable SUSFS"
-        required: true
+      droidspaces_ntsync:
+        description: "启用 Droidspaces 容器 NTSync 支持（需启用 Droidspaces）"
+        required: false
         type: boolean
         default: false
   workflow_call:
     inputs:
-      kittisu_branch:
-        required: false
+      kernelsu_variant:
+        required: true
         type: string
-        default: main
       version:
         required: false
         type: string
@@ -104,13 +135,22 @@ on:
         required: false
         type: boolean
         default: false
+      use_nomount:
+        required: false
+        type: boolean
+        default: false
+      use_networking:
+        required: false
+        type: boolean
+        default: false
       cve_2026_43499_patch:
         required: false
         type: boolean
         default: false
-      cancel_susfs:
+      ksu_mode:
         required: false
-        type: boolean
+        type: string
+        default: 关闭
       droidspaces:
         required: false
         type: string
@@ -118,13 +158,18 @@ on:
       artifact_upload_mode:
         required: false
         type: string
-        default: "Upload all"
+        default: "上传全部"
       droidspaces_ntsync:
         required: false
         type: boolean
         default: false
       called_from_main:
-        description: "Called from main.yml (internal use)"
+        description: "是否从 main.yml 调用（内部使用）"
+        required: false
+        type: boolean
+        default: false
+      export_susfs_patches:
+        description: "导出 SUSFS 集成补丁（由 main.yml 传入）"
         required: false
         type: boolean
         default: false
@@ -189,24 +234,30 @@ jobs:
       kernel_version: "6.1"
       sub_level: ${{ matrix.sub_level }}
       os_patch_level: ${{ matrix.os_patch_level }}
-      kittisu_branch: ${{ inputs.kittisu_branch }}
+      ksu_variant: ${{ inputs.kernelsu_variant }}
+      kittisu_branch: ${{ inputs.kittisu_branch || 'main' }}
       version: ${{ inputs.version || '' }}
       build_time: ${{ inputs.build_time || '' }}
       use_zram: ${{ inputs.use_zram }}
       use_bbg: ${{ inputs.use_bbg }}
       use_kpm: ${{ inputs.use_kpm }}
       use_rekernel: ${{ inputs.use_rekernel || false }}
+      use_nomount: ${{ inputs.use_nomount || false }}
+      use_networking: ${{ inputs.use_networking || false }}
       cve_2026_43499_patch: ${{ inputs.cve_2026_43499_patch }}
+      export_susfs_patches: ${{ inputs.export_susfs_patches || false }}
       supp_op: false
-      enable_susfs: ${{ !inputs.cancel_susfs }}
+      enable_susfs: ${{ inputs.ksu_mode != '禁用SUSFS' && inputs.ksu_mode != '禁用KSU' }}
+      ksu_mode: ${{ inputs.ksu_mode || '关闭' }}
       droidspaces: ${{ inputs.droidspaces || 'off' }}
       droidspaces_ntsync: ${{ inputs.droidspaces_ntsync || false }}
       artifact_upload_mode: ${{ inputs.artifact_upload_mode }}
 
   # 仅在直接触发时运行，从 main.yml 调用时跳过
   get-ksu-manager:
-    if: ${{ !inputs.called_from_main }}
+    if: ${{ !inputs.called_from_main && inputs.ksu_mode != '禁用KSU' }}
     uses: ./.github/workflows/get-manager.yml
     secrets: inherit
     with:
-      kittisu_branch: ${{ inputs.kittisu_branch }}
+      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kittisu_branch: ${{ inputs.kittisu_branch || 'main' }}
