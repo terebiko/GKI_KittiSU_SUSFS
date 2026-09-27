@@ -1,5 +1,8 @@
 name: Track KittiSU Main Updates
 
+permissions:
+  contents: write
+
 on:
   schedule:
     - cron: '0 0 */3 * *'
