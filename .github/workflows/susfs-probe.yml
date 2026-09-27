@@ -28,10 +28,11 @@ on:
         required: true
         type: choice
         options:
+          - KittiSU
           - SukiSU
           - ReSukiSU
           - Official
-        default: SukiSU
+        default: KittiSU
       sub_level_min:
         description: "最小子版本号（留空不限）"
         required: false
