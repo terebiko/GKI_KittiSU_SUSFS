@@ -347,8 +347,8 @@ jobs:
           fi
 
           echo "下载最新稳定版 SUSFS 模块..."
-          NAME=$(curl -s "https://api.github.com/repos/sidex1025/susfs4ksu-module/releases/latest" | jq -r '.assets[] | select(.name | endswith(".zip")) | .name')
-          URL=$(curl -s "https://api.github.com/repos/sidex1025/susfs4ksu-module/releases/latest" | jq -r '.assets[] | select(.name | endswith(".zip")) | .browser_download_url')
+          NAME=$(curl -s "https://api.github.com/repos/sidex15/susfs4ksu-module/releases/latest" | jq -r '.assets[] | select(.name | endswith(".zip")) | .name')
+          URL=$(curl -s "https://api.github.com/repos/sidex15/susfs4ksu-module/releases/latest" | jq -r '.assets[] | select(.name | endswith(".zip")) | .browser_download_url')
           SUSFS_NAME=$(echo "$NAME" | sed 's/\.zip$//')
           echo "SUSFS_NAME=$SUSFS_NAME" >> $GITHUB_ENV
 
