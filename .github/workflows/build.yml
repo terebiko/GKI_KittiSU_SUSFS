@@ -1284,11 +1284,11 @@ jobs:
             set_config "CONFIG_$cfg" y
           done
 
-          # CIFS 网络文件系统（NETFS_SUPPORT 为 5.15+ 符号，5.10 无此依赖不写入）
+          # CIFS 网络文件系统（5.10 和 6.1 不写入 NETFS_SUPPORT）
           for cfg in CIFS NETWORK_FILESYSTEMS KEYS CIFS_XATTR CIFS_POSIX; do
             set_config "CONFIG_$cfg" y
           done
-          if [ "$KVER" != "5.10" ]; then
+          if [ "$KVER" != "5.10" ] && [ "$KVER" != "6.1" ]; then
             set_config CONFIG_NETFS_SUPPORT y
           fi
 
